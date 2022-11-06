@@ -149,7 +149,7 @@ def mean_fetch_time(net):
     h2 = net.get('h2')
     total_time = 0
     for i in range(3):
-        total_time += float(h2.popen("curl -o /dev/null -s -w %%{time_total} %s"%(h1.IP())).communicate()[0])
+        total_time += float(h2.popen("curl -o /dev/null -s -w %%{time_total} %s/http/index.html"%(h1.IP())).communicate()[0])
     return total_time / 3
 
 def bufferbloat():
