@@ -80,7 +80,14 @@ class BBTopo(Topo):
         # interface names will change from s0-eth1 to newname-eth1.
         switch = self.addSwitch('s0')
 
-        # TODO: Add links with appropriate characteristics
+        # Add links with appropriate characteristics
+        link_delay = "%sms"%(args.delay)
+        host_bandwidth = args.bw_host
+        bottleneck_bandwidth = args.bw_net
+        max_queue = args.maxq
+        # First link with large bandwidth
+        self.addLink('h1', switch, bw=host_bandwidth, delay=link_delay, max_queue_size=max_queue)
+        self.addLink(switch, 'h2', bw=net_bandwidth, delay=link_delay, max_queue_size=max_queue)
 
 # Simple wrappers around monitoring utilities.  You are welcome to
 # contribute neatly written (using classes) monitoring scripts for
@@ -111,6 +118,8 @@ def start_iperf(net):
     server = h2.popen("iperf -s -w 16m")
     # TODO: Start the iperf client on h1.  Ensure that you create a
     # long lived TCP flow. You may need to redirect iperf's stdout to avoid blocking.
+    h1 = net.get('h1')
+    h1.cmd("iperf -t %s -c %s"%(str(args.time), h2.IP()))
 
 def start_webserver(net):
     h1 = net.get('h1')
@@ -119,7 +128,7 @@ def start_webserver(net):
     return [proc]
 
 def start_ping(net):
-    # TODO: Start a ping train from h1 to h2 (or h2 to h1, does it
+    # Start a ping train from h1 to h2 (or h2 to h1, does it
     # matter?)  Measure RTTs every 0.1 second.  Read the ping man page
     # to see how to do this.
 
@@ -130,7 +139,18 @@ def start_ping(net):
     # until stdout is read. You can avoid this by runnning popen.communicate() or
     # redirecting stdout
     h1 = net.get('h1')
-    popen = h1.popen("echo '' > %s/ping.txt"%(args.dir), shell=True)
+    h2 = net.get('h2')
+    popen = h1.popen("ping -i 0.1 -c %d %s > %s/ping.txt"%(args.time * 10, h2.IP(), args.dir), shell=True)
+    popen.communicate()
+
+# helper function that will fetch a webpage from h1 three times and measure mean time used
+def mean_fetch_time(net):
+    h1 = net.get('h1')
+    h2 = net.get('h2')
+    total_time = 0
+    for i in range(3):
+        total_time += float(h2.popen("curl -o /dev/null -s -w %%{time_total} %s"%(h1.IP())).communicate()[0])
+    return total_time / 3
 
 def bufferbloat():
     if not os.path.exists(args.dir):
@@ -153,7 +173,7 @@ def bufferbloat():
     start_tcpprobe("cwnd.txt")
     start_ping(net)
 
-    # TODO: Start monitoring the queue sizes.  Since the switch I
+    # Start monitoring the queue sizes.  Since the switch I
     # created is "s0", I monitor one of the interfaces.  Which
     # interface?  The interface numbering starts with 1 and increases.
     # Depending on the order you add links to your network, this
@@ -161,10 +181,20 @@ def bufferbloat():
     #
     # qmon = start_qmon(iface='s0-eth2',
     #                  outfile='%s/q.txt' % (args.dir))
-    qmon = None
+    # link's queue is set to the start of the link, traffic from h1 to h2
+    # so will first go through buffer for link h1 s0, then buffer s0 h2
+    # bottleneck is link s0 h2, so profile queue for the link with bottleneck
+    # the queue at s0's 2nd interface
+    qmon = stert_qmon(iface='s0-eth2', outfile='%s/q.txt'%(args.dir))
 
-    # TODO: Start iperf, webservers, etc.
-    # start_iperf(net)
+    # Start iperf, webservers, etc.
+    # Note here except for webserver, we want them run in background
+    # So create the others as multiprocess process
+    proc_iperf = Process(target=start_iperf, args=(net,))
+    proc_iperf.start()
+    proc_ping = Process(target=start_ping, args=(net,))
+    proc_ping.start()
+    start_webserver(net)
 
     # Hint: The command below invokes a CLI which you can use to
     # debug.  It allows you to run arbitrary commands inside your
@@ -172,16 +202,18 @@ def bufferbloat():
     #
     # CLI(net)
 
-    # TODO: measure the time it takes to complete webpage transfer
+    # measure the time it takes to complete webpage transfer
     # from h1 to h2 (say) 3 times.  Hint: check what the following
     # command does: curl -o /dev/null -s -w %{time_total} google.com
     # Now use the curl command to fetch webpage from the webserver you
     # spawned on host h1 (not from google!)
     # Hint: have a separate function to do this and you may find the
     # loop below useful.
+    three_fetch_means = []
     start_time = time()
     while True:
         # do the measurement (say) 3 times.
+        three_fetch_means.append(mean_fetch_time(net))
         sleep(1)
         now = time()
         delta = now - start_time
@@ -189,9 +221,13 @@ def bufferbloat():
             break
         print "%.1fs left..." % (args.time - delta)
 
-    # TODO: compute average (and standard deviation) of the fetch
+    # compute average (and standard deviation) of the fetch
     # times.  You don't need to plot them.  Just note it in your
     # README and explain.
+    fetch_stats = open("%s/webpage_fetch_stats.txt", "w")
+    fetch_stats.write("fetch average = %s\n"%(mean(three_fetch_means)))
+    fetch_stats.write("fetch std dev = %s\n"%(stdev(three_fetch_means)))
+    fetch_stats.close()
 
     stop_tcpprobe()
     if qmon is not None:
