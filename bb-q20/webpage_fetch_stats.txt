@@ -1,0 +1,2 @@
+fetch average = 0.500966666667
+fetch std dev = 0.0755140825718

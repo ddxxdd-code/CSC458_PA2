@@ -22,6 +22,8 @@ import sys
 import os
 import math
 
+import helper
+
 # TODO: Don't just read the TODO sections in this code.  Remember that
 # one of the goals of this assignment is for you to learn how to use
 # Mininet.
@@ -87,7 +89,7 @@ class BBTopo(Topo):
         max_queue = args.maxq
         # First link with large bandwidth
         self.addLink('h1', switch, bw=host_bandwidth, delay=link_delay, max_queue_size=max_queue)
-        self.addLink(switch, 'h2', bw=net_bandwidth, delay=link_delay, max_queue_size=max_queue)
+        self.addLink(switch, 'h2', bw=bottleneck_bandwidth, delay=link_delay, max_queue_size=max_queue)
 
 # Simple wrappers around monitoring utilities.  You are welcome to
 # contribute neatly written (using classes) monitoring scripts for
@@ -185,7 +187,7 @@ def bufferbloat():
     # so will first go through buffer for link h1 s0, then buffer s0 h2
     # bottleneck is link s0 h2, so profile queue for the link with bottleneck
     # the queue at s0's 2nd interface
-    qmon = stert_qmon(iface='s0-eth2', outfile='%s/q.txt'%(args.dir))
+    qmon = start_qmon(iface='s0-eth2', outfile='%s/q.txt'%(args.dir))
 
     # Start iperf, webservers, etc.
     # Note here except for webserver, we want them run in background
@@ -224,9 +226,9 @@ def bufferbloat():
     # compute average (and standard deviation) of the fetch
     # times.  You don't need to plot them.  Just note it in your
     # README and explain.
-    fetch_stats = open("%s/webpage_fetch_stats.txt", "w")
-    fetch_stats.write("fetch average = %s\n"%(mean(three_fetch_means)))
-    fetch_stats.write("fetch std dev = %s\n"%(stdev(three_fetch_means)))
+    fetch_stats = open("%s/webpage_fetch_stats.txt"%(args.dir), "w")
+    fetch_stats.write("fetch average = %s\n"%(helper.avg(three_fetch_means)))
+    fetch_stats.write("fetch std dev = %s\n"%(helper.stdev(three_fetch_means)))
     fetch_stats.close()
 
     stop_tcpprobe()
