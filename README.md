@@ -1,4 +1,19 @@
 # CSC458_PA2
+## Notice
+This is a course assignment of CSC458, completed individually.
+
+The copyright of starter code belongs to the teaching team.
+
+Please don't copy and submit as you own assignment answer as that is an academic offence.
+
+Computer networks is an interesting course and this assignment gives a picture of how to do experiments.
+
+I feel the strategy here involved in this assignment, compared to the first assignment, has more research components. Although bufferbloat is a known problem, it is still fun to observe the phenomenon, investigate through experiments with different buffer sizes, and analyze in theoretical discussions.
+
+Please contact me if making this repository public is inappropriate.
+
+Have fun!
+
 ## Instructions to run
 To reproduce the results, run `sudo ./run.sh`. 
 
